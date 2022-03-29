@@ -9,3 +9,6 @@ edition = "2021"
 serenity = { default-features = false, features = ["client", "gateway", "rustls_backend", "model", "unstable_discord_api"] }
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 dotenv = "0.15"
+chrono = "0.4"
+sqlx = { version = "0.5.11", features = ["runtime-tokio-rustls", "sqlite", "offline", "chrono"] }
+regex = "1.5.5"
