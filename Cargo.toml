@@ -12,3 +12,4 @@ dotenv = "0.15"
 chrono = "0.4"
 sqlx = { version = "0.5.11", features = ["runtime-tokio-rustls", "sqlite", "offline", "chrono"] }
 regex = "1.5.5"
+uuid = { version = "0.8", features = ["v4"] }
