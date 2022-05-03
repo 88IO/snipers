@@ -1,14 +1,85 @@
+use serenity::builder::{CreateButton, CreateActionRow};
 use serenity::model::interactions::application_command::{
     ApplicationCommand,
     ApplicationCommandOptionType, ApplicationCommandInteractionDataOption,
     ApplicationCommandInteractionDataOptionValue
 };
-use serenity::Result;
+use serenity::model::interactions::message_component::ButtonStyle;
 use serenity::prelude::Context;
+use std::fmt;
+#[derive(Debug)]
+pub struct ParseComponentError(String);
 
-pub async fn register_commands(ctx: &Context) -> Result<Vec<ApplicationCommand>> {
+impl fmt::Display for ParseComponentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Failed to parse {} as component", self.0)
+    }
+}
+
+impl std::error::Error for ParseComponentError {}
+
+impl std::str::FromStr for SnipeMenu {
+    type Err = ParseComponentError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "時間後" => Ok(SnipeMenu::Relative),
+            "時刻" => Ok(SnipeMenu::Absolute),
+            _ => Err(ParseComponentError(s.to_string()))
+        }
+    }
+}
+
+pub enum SnipeMenu {
+    Relative,
+    Absolute
+}
+
+impl fmt::Display for SnipeMenu {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+         match self {
+             Self::Relative => write!(f, "時間後"),
+             Self::Absolute => write!(f, "時刻"),
+         }
+    }
+}
+
+impl SnipeMenu {
+    fn emoji(&self) -> char {
+        match self {
+            Self::Relative => '\u{23F2}',
+            Self::Absolute => '\u{23F0}',
+        }
+    }
+
+    fn style(&self) -> ButtonStyle {
+        match self {
+            Self::Relative => ButtonStyle::Primary,
+            Self::Absolute => ButtonStyle::Secondary,
+        }
+    }
+
+    fn button(&self) -> CreateButton {
+        let mut b = CreateButton::default();
+        b.custom_id(self.to_string());
+        b.emoji(self.emoji());
+        b.label(self);
+        b.style(self.style());
+        b
+    }
+
+    pub fn action_row() -> CreateActionRow {
+        let mut ar = CreateActionRow::default();
+        ar.add_button(SnipeMenu::Absolute.button());
+        ar.add_button(SnipeMenu::Relative.button());
+        ar
+    }
+}
+
+pub async fn register_commands(ctx: &Context) -> serenity::Result<Vec<ApplicationCommand>> {
     ApplicationCommand::set_global_application_commands(&ctx.http, |commands| {
         commands
+            /*
             .create_application_command(|command| {
                 command.name("snipe_at")
                     .description("指定した時刻に通話を強制切断します")
@@ -31,8 +102,9 @@ pub async fn register_commands(ctx: &Context) -> Result<Vec<ApplicationCommand>>
                             .required(true)
                     })
             })
+            */
             .create_application_command(|command| {
-                command.name("schedule").description("通話の切断予定を表示します")
+                command.name("display").description("通話の切断予定を表示します")
             })
             .create_application_command(|command| {
                 command.name("clear").description("通話の切断予定を削除します")
@@ -42,7 +114,7 @@ pub async fn register_commands(ctx: &Context) -> Result<Vec<ApplicationCommand>>
                     .create_option(|option| {
                         option
                             .name("time")
-                            .description("切断する時刻")
+                            .description("切断する絶対/相対時刻")
                             .kind(ApplicationCommandOptionType::String)
                             .required(true)
                     })
@@ -51,12 +123,12 @@ pub async fn register_commands(ctx: &Context) -> Result<Vec<ApplicationCommand>>
                             .name("kind")
                             .description("指定方法を選択します")
                             .kind(ApplicationCommandOptionType::String)
-                            .add_string_choice("oclock", "oclock")
-                            .add_string_choice("after", "after")
+                            .add_string_choice("o'clock", "oclock")
+                            .add_string_choice("later", "later")
                     })
             })
             .create_application_command(|command| {
-                command.name("timezone").description("UTCからの時差を設定します")
+                command.name("timezone").description("UTCからの時差を設定/表示します")
                     .create_option(|option| {
                         option
                             .name("offset")
@@ -64,7 +136,7 @@ pub async fn register_commands(ctx: &Context) -> Result<Vec<ApplicationCommand>>
                             .kind(ApplicationCommandOptionType::Integer)
                             .min_int_value(-12)
                             .max_int_value(12)
-                            .required(true)
+                            .required(false)
                     })
             })
     })

@@ -5,7 +5,7 @@ mod database;
 
 use handler::Handler;
 use dotenv::dotenv;
-use serenity::Client;
+use serenity::{client::Client, prelude::GatewayIntents};
 use std::env;
 
 #[tokio::main]
@@ -20,11 +20,13 @@ async fn main() {
         .parse()
         .expect("application_id is not a valid value");
 
-    //sqlx::migrate!("./migrations").run(&database).await.expect("Couldn't run database migrations");
-
+    let intents = GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::GUILD_VOICE_STATES
+        | GatewayIntents::DIRECT_MESSAGES;
 
     let handler = Handler::new("./database.sqlite").await;
-    let mut client = Client::builder(token)
+
+    let mut client = Client::builder(token, intents)
         .event_handler(handler)
         .application_id(application_id)
         .await

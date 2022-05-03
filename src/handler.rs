@@ -1,12 +1,16 @@
 use crate::command_utils::{
     register_commands,
     string_option_ref,
-    int_option_ref
+    int_option_ref,
+    SnipeMenu
 };
-use crate::job::{Job, EventType};
+use std::str::FromStr;
+use crate::job::EventType;
 use crate::database::SqliteDatabase;
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use serenity::model::guild::Member;
+use serenity::model::id::{UserId, GuildId};
 use serenity::{
     async_trait,
     model::interactions::{
@@ -14,52 +18,49 @@ use serenity::{
         application_command::ApplicationCommandInteraction,
     },
     model::{
-        misc::Mention,
+        mention::Mention,
         gateway::Ready,
         interactions::Interaction
     },
     prelude::*,
 };
-use chrono::{Utc, Duration, FixedOffset, TimeZone};
+use chrono::{Utc, Duration, FixedOffset, DateTime};
 use regex::Regex;
 
+const DT_FORMAT: &str = "%m/%d %H:%M:%S (%:z)";
 
 pub struct Handler {
     database: SqliteDatabase,
     re_time: Regex,
     is_loop_running: AtomicBool
 }
+
 #[async_trait] impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             match command.data.name.as_str() {
-                "snipe" => {
-                    println!("{}", command.data.options.len());
-                },
                 "timezone" => {
-                    self.set_timezone(&ctx, &command).await;
+                    if let Some(offset) = int_option_ref(&command.data.options, "offset") {
+                        self.set_timezone(&ctx, &command, offset).await;
+                    } else {
+                        self.get_timezone(&ctx, &command).await;
+                    }
                 },
-                "snipe_at" => {
-                    self.snipe_at(&ctx, &command).await;
+                "snipe" => {
+                    let time = string_option_ref(&command.data.options, "time").unwrap();
+                    let kind = string_option_ref(&command.data.options, "kind");
+                    self.snipe(&ctx, &command, time, kind).await;
                 },
-                "snipe_in" => {
-                    self.snipe_in(&ctx, &command).await;
+                "display" => {
+                    self.display_jobs(&ctx, &command).await;
+                },
+                "clear" => {
+                    let guild_id = command.guild_id.unwrap();
+                    let user_id = command.user.id;
+                    self.remove_job(&ctx, &command, user_id, guild_id).await;
                 },
                 _ => println!("not implemented :("),
             }
-
-            /*
-            if let Err(why) = command
-                .create_interaction_response(&ctx.http, |response| {
-                    response
-                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|message| message.content(content))
-                })
-                .await
-            {
-                println!("cannot respond to slash command: {}", why);
-            }
-            */
         }
     }
 
@@ -70,7 +71,7 @@ pub struct Handler {
         // ギルド更新
         if let Ok(guilds) = ready.user.guilds(&ctx.http).await {
             for guild in guilds {
-                if let Err(why) = self.database.insert_setting(guild.id, 0).await
+                if let Err(why) = self.database.insert_guild_setting(guild.id, 0).await
                 {
                     println!("Already exists: {}, {}", guild.id, why);
                 }
@@ -82,6 +83,22 @@ pub struct Handler {
         if let Ok(settings) = self.database.get_settings().await
         {
             println!("{:#?}", settings);
+        }
+
+        if let Ok(_) = self.is_loop_running.compare_exchange(false, true,
+                                                             Ordering::Relaxed,
+                                                             Ordering::Relaxed)
+        {
+            if self.database.count_jobs().await.unwrap() > 0 {
+                self.run_pending(&ctx).await;
+            }
+        }
+    }
+
+    async fn guild_member_addition(&self, _ctx: Context, member: Member) {
+        println!("add member: {:#?}", member);
+        if let Err(why) = self.database.insert_guild_setting(member.guild_id, 0).await {
+            println!("exist: {}", why);
         }
     }
 }
@@ -102,12 +119,98 @@ impl Handler {
         }
     }
 
-    async fn set_timezone(&self, ctx: &Context, command: &ApplicationCommandInteraction) {
+    async fn snipe(&self, ctx: &Context, command: &ApplicationCommandInteraction,
+                   time: &String, kind: Option<&String>) {
         let guild_id = command.guild_id.unwrap();
-        let offset = int_option_ref(&command.data.options, "offset").unwrap();
+        let user_id = command.user.id;
+
+        let target_datetime: DateTime<FixedOffset>;
+        if let Some(k) = kind {
+            target_datetime = match k.as_str() {
+                "oclock" =>  self.absolute_datetime(guild_id, time).await.unwrap(),
+                "later" => self.relative_datetime(guild_id, time).await.unwrap(),
+                _ => return
+            };
+
+            command
+                .create_interaction_response(&ctx.http, |response| {
+                    response
+                        .interaction_response_data(|message| {
+                            message
+                                .components(|c| c)
+                                .content(format!("{}を{}に切断します",
+                                                Mention::from(user_id), target_datetime.format(DT_FORMAT)))
+                        })
+                })
+                .await
+                .unwrap();
+        } else {
+            let _ = command.defer(&ctx.http).await;
+
+            let msg = command
+                .create_followup_message(&ctx.http, |response| {
+                    response
+                        .content("時間指定方法の選択")
+                        .components(|c| c.add_action_row(SnipeMenu::action_row()))
+                })
+                .await
+                .unwrap();
+
+            let mci = match msg.await_component_interaction(ctx)
+                .author_id(user_id)
+                .timeout(std::time::Duration::from_secs(30))
+                .await {
+                    Some(ci) => {
+                        ci
+                    },
+                    None => {
+                        command
+                            .edit_original_interaction_response(&ctx.http, |message| {
+                                message
+                                    .components(|c| c)
+                                    .content("タイムアウトしました")
+                            })
+                            .await
+                            .unwrap();
+                        return;
+                    } };
+
+            target_datetime = match SnipeMenu::from_str(mci.data.custom_id.as_str()).unwrap() {
+                SnipeMenu::Absolute => {
+                    self.absolute_datetime(guild_id, time).await.unwrap()
+                },
+                SnipeMenu::Relative => {
+                    self.relative_datetime(guild_id, time).await.unwrap()
+                }
+            };
+
+            command
+                .edit_original_interaction_response(&ctx.http, |message| {
+                    message
+                        .components(|c| c)
+                        .content(format!("{}を{}に切断します",
+                                        Mention::from(user_id), target_datetime.format(DT_FORMAT)))
+                })
+                .await
+                .unwrap();
+        };
+
+        self.add_job(target_datetime, user_id, guild_id).await;
+
+
+        if let Ok(_) = self.is_loop_running.compare_exchange(
+            false, true,
+            Ordering::Relaxed, Ordering::Relaxed)
+        {
+            self.run_pending(ctx).await;
+        }
+    }
+
+    async fn set_timezone(&self, ctx: &Context, command: &ApplicationCommandInteraction, offset: &i64) {
+        let guild_id = command.guild_id.unwrap();
         let timezone = FixedOffset::east(3600 * *offset as i32);
 
-        if let Ok(_) = self.database.update_setting(guild_id, offset).await {
+        if let Ok(_) = self.database.update_guild_setting(guild_id, offset).await {
             if let Err(why) = command
                 .create_interaction_response(&ctx.http, |response| {
                     response
@@ -121,41 +224,61 @@ impl Handler {
         }
     }
 
-    async fn snipe_in(&self, ctx: &Context, command: &ApplicationCommandInteraction) {
+    async fn get_timezone(&self, ctx: &Context, command: &ApplicationCommandInteraction) {
         let guild_id = command.guild_id.unwrap();
-        let user_id = command.user.id;
 
-        let interval = command
-            .data
-            .options
-            .iter()
-            .find(|&v| v.name == "interval")
-            .unwrap()
-            .value
-            .as_ref()
-            .unwrap()
-            .to_string();
+        if let Ok(setting) = self.database.get_guild_setting(guild_id).await {
+            command
+                .create_interaction_response(&ctx.http, |response| {
+                    response
+                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|message|
+                            message.content(format!("{}に設定しました", FixedOffset::east(3600 * setting.utc_offset)))
+                        )
+                })
+                .await
+                .unwrap_or_else(|why| println!("cannot respond to slash command: {}", why));
+        }
+    }
 
-        let caps = self.re_time.captures(&interval).unwrap();
+    async fn relative_datetime(&self, guild_id: GuildId, interval: &String) -> Option<DateTime<FixedOffset>> {
+        let caps = self.re_time.captures(&interval)?;
         let hour: i64 = caps["hour"].parse().unwrap();
         let minute: i64 = caps["minute"].parse().unwrap();
 
         let guild_setting = self.database.get_guild_setting(guild_id).await.unwrap();
 
-        let target_datetime = {
-            let datetime_utc = Utc::now() + Duration::hours(hour) + Duration::minutes(minute);
-            datetime_utc.with_timezone(&FixedOffset::east(3600 * guild_setting.utc_offset))
-        };
+        let datetime_utc = Utc::now() + Duration::hours(hour) + Duration::minutes(minute);
+        Some(datetime_utc.with_timezone(&FixedOffset::east(3600 * guild_setting.utc_offset)))
+    }
 
+    async fn absolute_datetime(&self, guild_id: GuildId, time: &String) -> Option<DateTime<FixedOffset>> {
+        let caps = self.re_time.captures(time).unwrap();
+        let hour: u32 = caps["hour"].parse().unwrap();
+        let minute: u32 = caps["minute"].parse().unwrap();
 
-        let naive_utc = target_datetime.naive_utc();
+        let guild_setting = self.database.get_guild_setting(guild_id).await.unwrap();
+
+        let tmp_datetime = Utc::today()
+            .with_timezone(&FixedOffset::east(3600 * guild_setting.utc_offset))
+            .and_hms(hour, minute, 0);
+
+        if Utc::now() >= tmp_datetime {
+            Some(tmp_datetime + Duration::days(1))
+        } else {
+            Some(tmp_datetime)
+        }
+    }
+
+    async fn add_job(&self, datetime: DateTime<FixedOffset>, user_id: UserId, guild_id: GuildId) {
+        let naive_utc = datetime.naive_utc();
 
         // 切断前通知予約
         let before3min = naive_utc - Duration::minutes(3);
         if before3min < Utc::now().naive_utc() {
             if let Err(why) = self.database
-                .insert_job(before3min, command.user.id,
-                            command.guild_id.unwrap(), EventType::Disconnect)
+                .insert_job(before3min, user_id,
+                            guild_id, EventType::Notification3Min)
                 .await
             {
                 println!("{:?}", why);
@@ -169,109 +292,63 @@ impl Handler {
         {
             println!("{:?}", why);
         }
+    }
 
-        if let Err(why) = command
+    async fn display_jobs(&self, ctx: &Context, command: &ApplicationCommandInteraction) {
+        let guild_id = command.guild_id.unwrap();
+
+        let jobs = self.database.get_guild_jobs(guild_id).await.unwrap();
+
+        command
             .create_interaction_response(&ctx.http, |response| {
                 response
                     .kind(InteractionResponseType::ChannelMessageWithSource)
                     .interaction_response_data(|message|
-                        message.content(format!("{}を{}に切断します", Mention::from(command.user.id), target_datetime)))
+                        message.embed(|embed| {
+                            jobs.iter().fold(
+                                embed
+                                    .title("射殺予定")
+                                    .description("snipebotの通話切断予定表"),
+                                |e, job|
+                                    e.field(job.datetime().format(DT_FORMAT), Mention::from(job.userid()), false)
+                            )
+                        })
+                    )
             })
-            .await {
-            println!("cannot respond to slash command: {}", why);
-        }
-
-        if let Ok(_) = self.is_loop_running.compare_exchange(
-            false, true,
-            Ordering::Relaxed, Ordering::Relaxed
-            )
-        {
-            self.run_pending(ctx).await;
-        }
+            .await
+            .unwrap_or_else(|why| println!("cannot respond to slash command: {}", why));
     }
 
-    async fn snipe_at(&self, ctx: &Context, command: &ApplicationCommandInteraction) {
-        let guild_id = command.guild_id.unwrap();
+    async fn remove_job(&self, ctx: &Context, command: &ApplicationCommandInteraction,
+                        user_id: UserId, guild_id: GuildId) {
+        self.database.delete_guild_jobs(user_id, guild_id).await.unwrap();
 
-        let time = string_option_ref(&command.data.options, "time").unwrap();
-
-        let caps = self.re_time.captures(time).unwrap();
-        let hour: u32 = caps["hour"].parse().unwrap();
-        let minute: u32 = caps["minute"].parse().unwrap();
-
-        let guild_setting = self.database.get_guild_setting(guild_id).await.unwrap();
-
-        let target_datetime = {
-            let tmp_datetime = Utc::today()
-                .with_timezone(&FixedOffset::east(3600 * guild_setting.utc_offset))
-                .and_hms(hour, minute, 0);
-
-            if Utc::now() >= tmp_datetime {
-                tmp_datetime + Duration::days(1)
-            } else {
-                tmp_datetime
-            }
-        };
-
-        let naive_utc = target_datetime.naive_utc();
-
-        // 切断前通知予約
-        let before3min = naive_utc - Duration::minutes(3);
-        if before3min < Utc::now().naive_utc() {
-            if let Err(why) = self.database
-                .insert_job(before3min, command.user.id,
-                            command.guild_id.unwrap(), EventType::Disconnect)
-                .await
-            {
-                println!("{:?}", why);
-            }
-        }
-
-        // 切断予約
-        if let Err(why) = self.database
-            .insert_job(naive_utc, command.user.id,
-                        command.guild_id.unwrap(), EventType::Disconnect)
-            .await
-        {
-            println!("{:?}", why);
-        }
-
-        if let Err(why) = command
+        command
             .create_interaction_response(&ctx.http, |response| {
                 response
                     .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| message.content(format!("{}を{}に切断します", Mention::from(command.user.id), target_datetime)))
+                    .interaction_response_data(|message|
+                        message.content(format!("{}の切断予約を削除しました", Mention::from(user_id)))
+                    )
             })
             .await
-        {
-            println!("cannot respond to slash command: {}", why);
-        }
-
-        if let Ok(_) = self.is_loop_running.compare_exchange(
-            false, true,
-            Ordering::Relaxed, Ordering::Relaxed
-            )
-        {
-            self.run_pending(ctx).await;
-        }
+            .unwrap_or_else(|why| println!("cannot respond to slash command: {}", why));
     }
 
     async fn run_pending(&self, ctx: &Context) {
-        while self.database.count_jobs().await.unwrap() != 0 {
+        while self.database.count_jobs().await.unwrap() > 0 {
+            println!("loop...");
             let jobs = self.database.pull_executables().await.unwrap();
 
             for job in jobs {
                 println!("{:#?}", job);
                 match job.event_type {
                     EventType::Disconnect => {
-                        let datetime = FixedOffset::east(3600 * job.utc_offset)
-                            .from_utc_datetime(&job.naive_utc);
-
-                        let _ = job.direct_message(&ctx, |m| {
-                            m.content(format!("{}に通話を強制切断しました", datetime))
-                        }).await;
-
-                        let _ = job.disconnect(&ctx).await;
+                        if let Ok(_) = job.disconnect(&ctx).await {
+                            job.direct_message(&ctx, |m| {
+                                m.content(format!("{}に通話を強制切断しました", job.datetime().format(DT_FORMAT)))
+                            }).await.unwrap();
+                        }
                     },
                     EventType::Notification3Min => {
                         let _ = job.direct_message(&ctx, |m| {

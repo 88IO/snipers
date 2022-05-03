@@ -1,6 +1,6 @@
 use serenity::{model::{id::{GuildId, UserId}, guild::Member, channel::Message}, client::Context, builder::CreateMessage};
-use std::hash::{Hash, Hasher};
-use chrono::NaiveDateTime;
+use std::hash::Hash;
+use chrono::{NaiveDateTime, DateTime, FixedOffset, TimeZone};
 use sqlx;
 
 #[derive(Debug, Hash, PartialEq, sqlx::Type)]
@@ -53,6 +53,11 @@ impl Job {
 
     pub fn guildid(&self) -> GuildId {
         GuildId::from(self.guild_id as u64)
+    }
+
+    pub fn datetime(&self) -> DateTime<FixedOffset> {
+        FixedOffset::east(3600 * self.utc_offset)
+            .from_utc_datetime(&self.naive_utc)
     }
 
     pub async fn disconnect(&self, ctx: &Context) -> serenity::Result<Member> {

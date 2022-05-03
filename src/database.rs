@@ -53,6 +53,38 @@ impl SqliteDatabase {
             .await
     }
 
+    pub async fn delete_guild_jobs(&self,
+                        user_id: UserId,
+                        guild_id: GuildId)
+                        -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
+        let user_id = user_id.0 as i64;
+        let guild_id = guild_id.0 as i64;
+
+        sqlx::query!(
+            "DELETE FROM job WHERE user_id=? AND guild_id=?",
+            user_id, guild_id
+            )
+            .execute(&self.database)
+            .await
+    }
+
+    pub async fn get_guild_jobs(&self, guild_id: GuildId)
+                                   -> Result<Vec<Job>, sqlx::Error> {
+        let guild_id = guild_id.0 as i64;
+
+        sqlx::query_as!(
+            Job,
+            "SELECT naive_utc, user_id, guild_id,
+                    event_type as 'event_type!: EventType',
+                    utc_offset as 'utc_offset!: i32'
+             FROM job
+             WHERE guild_id=?
+             ORDER BY naive_utc ASC",
+            guild_id)
+            .fetch_all(&self.database)
+            .await
+    }
+
     pub async fn count_jobs(&self) -> Result<i32, sqlx::Error> {
         let result = sqlx::query!("SELECT COUNT(*) as count from job")
             .fetch_one(&self.database)
@@ -72,16 +104,7 @@ impl SqliteDatabase {
             .await
     }
 
-    pub async fn get_settings(&self) -> Result<Vec<GuildSetting>, sqlx::Error> {
-        sqlx::query_as!(
-            GuildSetting,
-            r#"SELECT guild_id, utc_offset as "utc_offset!: i32" from setting"#
-            )
-            .fetch_all(&self.database)
-            .await
-    }
-
-    pub async fn insert_setting(&self, guild_id: GuildId, utc_offset: u64)
+    pub async fn insert_guild_setting(&self, guild_id: GuildId, utc_offset: u64)
                                 -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
         let guild_id = guild_id.0 as i64;
         let utc_offset = utc_offset as i64;
@@ -94,7 +117,7 @@ impl SqliteDatabase {
             .await
     }
 
-    pub async fn update_setting(&self, guild_id: GuildId, utc_offset: &i64)
+    pub async fn update_guild_setting(&self, guild_id: GuildId, utc_offset: &i64)
                                 -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
         let guild_id = guild_id.0 as i64;
 
@@ -103,6 +126,15 @@ impl SqliteDatabase {
             utc_offset, guild_id
             )
             .execute(&self.database)
+            .await
+    }
+
+    pub async fn get_settings(&self) -> Result<Vec<GuildSetting>, sqlx::Error> {
+        sqlx::query_as!(
+            GuildSetting,
+            r#"SELECT guild_id, utc_offset as "utc_offset!: i32" from setting"#
+            )
+            .fetch_all(&self.database)
             .await
     }
 }
