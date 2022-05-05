@@ -4,13 +4,16 @@ use crate::command_utils::{
     int_option_ref,
     SnipeMenu
 };
+use std::collections::HashMap;
 use std::str::FromStr;
 use crate::job::EventType;
 use crate::database::SqliteDatabase;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use serenity::model::guild::Member;
-use serenity::model::id::{UserId, GuildId};
+use serenity::model::event::{GuildMemberUpdateEvent, GuildMembersChunkEvent};
+use serenity::model::guild::{Member, Guild, Emoji, UnavailableGuild, PartialGuild};
+use serenity::model::id::{UserId, GuildId, EmojiId};
+use serenity::model::user::User;
 use serenity::{
     async_trait,
     model::interactions::{
@@ -35,7 +38,8 @@ pub struct Handler {
     is_loop_running: AtomicBool
 }
 
-#[async_trait] impl EventHandler for Handler {
+#[async_trait]
+impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             match command.data.name.as_str() {
@@ -95,10 +99,22 @@ pub struct Handler {
         }
     }
 
-    async fn guild_member_addition(&self, _ctx: Context, member: Member) {
-        println!("add member: {:#?}", member);
-        if let Err(why) = self.database.insert_guild_setting(member.guild_id, 0).await {
-            println!("exist: {}", why);
+    async fn guild_create(&self, _: Context, guild: Guild, is_new: bool) {
+        println!("guild_create: {:?}", guild.id);
+        if is_new {
+            if let Err(why) = self.database.insert_guild_setting(guild.id, 0).await {
+                println!("insert guild setting: {:?}", why);
+            }
+        }
+    }
+
+    async fn guild_delete(&self, _: Context, incomplete: UnavailableGuild, _: Option<Guild>) {
+        println!("guild_delete {:?}", incomplete.id);
+        if !incomplete.unavailable {
+            if let Err(why) = self.database.delete_guild_setting(incomplete.id).await {
+                println!("insert guild setting: {:?}", why);
+            }
+
         }
     }
 }

@@ -117,6 +117,18 @@ impl SqliteDatabase {
             .await
     }
 
+    pub async fn delete_guild_setting(&self, guild_id: GuildId)
+                                -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
+        let guild_id = guild_id.0 as i64;
+
+        sqlx::query!(
+            "DELETE FROM job WHERE guild_id=?",
+            guild_id
+            )
+            .execute(&self.database)
+            .await
+    }
+
     pub async fn update_guild_setting(&self, guild_id: GuildId, utc_offset: &i64)
                                 -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
         let guild_id = guild_id.0 as i64;
