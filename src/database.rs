@@ -86,7 +86,7 @@ impl SqliteDatabase {
     }
 
     pub async fn count_jobs(&self) -> Result<i32, sqlx::Error> {
-        let result = sqlx::query!("SELECT COUNT(*) as count from job")
+        let result = sqlx::query!("SELECT COUNT(*) as count FROM job")
             .fetch_one(&self.database)
             .await?;
         Ok(result.count)
@@ -98,7 +98,7 @@ impl SqliteDatabase {
 
         sqlx::query_as!(
             GuildSetting,
-            "SELECT guild_id, utc_offset as 'utc_offset!: i32' from setting WHERE guild_id=?",
+            "SELECT guild_id, utc_offset as 'utc_offset!: i32' FROM setting WHERE guild_id=?",
             guild_id)
             .fetch_one(&self.database)
             .await
@@ -134,7 +134,7 @@ impl SqliteDatabase {
         let guild_id = guild_id.0 as i64;
 
         sqlx::query!(
-            "UPDATE setting SET utc_offset = ? WHERE guild_id = ?",
+            "UPDATE setting SET utc_offset=? WHERE guild_id=?",
             utc_offset, guild_id
             )
             .execute(&self.database)
@@ -144,7 +144,7 @@ impl SqliteDatabase {
     pub async fn get_settings(&self) -> Result<Vec<GuildSetting>, sqlx::Error> {
         sqlx::query_as!(
             GuildSetting,
-            r#"SELECT guild_id, utc_offset as "utc_offset!: i32" from setting"#
+            r#"SELECT guild_id, utc_offset as "utc_offset!: i32" FROM setting"#
             )
             .fetch_all(&self.database)
             .await
