@@ -4,6 +4,7 @@ mod job;
 mod database;
 
 use handler::Handler;
+//use database::SqliteDatabase;
 use dotenv::dotenv;
 use serenity::{client::Client, prelude::GatewayIntents};
 use std::env;
@@ -32,6 +33,15 @@ async fn main() {
         .application_id(application_id)
         .await
         .expect("Error creating client.");
+
+    /*
+    {
+        let mut data = client.data.write().await;
+
+        data.insert::<SqliteDatabase>(
+            Arc::new(SqliteDatabase::new("./database.sqlite").await));
+    }
+    */
 
     if let Err(why) = client.start().await {
         println!("Client error: {:?}", why);

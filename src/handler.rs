@@ -4,16 +4,13 @@ use crate::command_utils::{
     int_option_ref,
     SnipeMenu
 };
-use std::collections::HashMap;
 use std::str::FromStr;
 use crate::job::EventType;
 use crate::database::SqliteDatabase;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use serenity::model::event::{GuildMemberUpdateEvent, GuildMembersChunkEvent};
-use serenity::model::guild::{Member, Guild, Emoji, UnavailableGuild, PartialGuild};
-use serenity::model::id::{UserId, GuildId, EmojiId};
-use serenity::model::user::User;
+use serenity::model::guild::{Guild, UnavailableGuild};
+use serenity::model::id::{UserId, GuildId};
 use serenity::{
     async_trait,
     model::interactions::{

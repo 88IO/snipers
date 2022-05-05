@@ -1,9 +1,16 @@
 use crate::job::{Job, EventType, GuildSetting};
+
+use std::sync::Arc;
 use chrono::NaiveDateTime;
-use serenity::model::id::{UserId, GuildId};
+use serenity::{model::id::{UserId, GuildId}, prelude::TypeMapKey};
+
 
 pub struct SqliteDatabase {
     database: sqlx::SqlitePool,
+}
+
+impl TypeMapKey for SqliteDatabase {
+    type Value = Arc<SqliteDatabase>;
 }
 
 impl SqliteDatabase {
