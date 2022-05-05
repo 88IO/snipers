@@ -1,0 +1,31 @@
+[package]
+name = "snipe"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+dotenv = "0.15"
+chrono = "0.4"
+sqlx = { version = "0.5.11", features = ["runtime-tokio-rustls", "sqlite", "chrono", "offline"] }
+regex = "1.5.5"
+
+[dependencies.serenity]
+default-features = false
+features = [
+    "builder",
+    "client",
+    "cache",
+    "collector",
+    "gateway",
+    "http",
+    "model",
+    "rustls_backend",
+]
+version = "0.11"
+
+[profile.release]
+strip = true
+lto = true
