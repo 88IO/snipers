@@ -94,9 +94,6 @@ impl EventHandler for Handler {
                 self.run_pending(&ctx).await;
             }
         }
-        println!("{:#?}", self.is_loop_running.compare_exchange(false, true,
-                                                            Ordering::Release,
-                                                            Ordering::Relaxed));
     }
 
     async fn guild_create(&self, _: Context, guild: Guild, is_new: bool) {
@@ -213,9 +210,6 @@ impl Handler {
 
         self.add_job(target_datetime, user_id, guild_id).await;
 
-        println!("after adding job");
-        println!("is_loop_running: {}", self.is_loop_running.load(Ordering::SeqCst));
-
         if let Ok(_) = self.is_loop_running.compare_exchange(
             false, true,
             Ordering::Release, Ordering::Relaxed)
@@ -223,7 +217,6 @@ impl Handler {
             println!("start loop");
             self.run_pending(ctx).await;
         }
-        println!("end snipe");
     }
 
     async fn set_timezone(&self, ctx: &Context, command: &ApplicationCommandInteraction, offset: &i64) {
