@@ -117,14 +117,7 @@ impl EventHandler for Handler {
 }
 
 impl Handler {
-    pub async fn new(filename: &str) -> Self {
-        let database = SqliteDatabase::new(filename).await;
-        let re_time = Regex::new(r"(?P<hour>\d{1,2}):(?P<minute>\d{1,2})").unwrap();
-
-        if let Ok(_) = database.pull_executables().await {
-            println!("Delete previous jobs.");
-        }
-
+    pub async fn new(database: SqliteDatabase, re_time: Regex) -> Self {
         Handler {
             database,
             re_time,
