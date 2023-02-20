@@ -1,7 +1,15 @@
-use serenity::{model::{id::{GuildId, UserId}, guild::Member, channel::Message}, client::Context, builder::CreateMessage};
-use std::hash::Hash;
+use serenity::{
+    client::Context,
+    builder::CreateMessage,
+    model::{
+        guild::Member,
+        channel::Message,
+        id::{GuildId, UserId}
+    }
+};
 use chrono::{NaiveDateTime, DateTime, FixedOffset, TimeZone};
 use sqlx;
+use std::hash::Hash;
 
 #[derive(Debug, Hash, PartialEq, sqlx::Type)]
 pub enum EventType {
@@ -40,7 +48,8 @@ impl Job {
     }
 
     pub fn datetime(&self) -> DateTime<FixedOffset> {
-        FixedOffset::east(3600 * self.utc_offset)
+        FixedOffset::east_opt(3600 * self.utc_offset)
+            .unwrap()
             .from_utc_datetime(&self.naive_utc)
     }
 

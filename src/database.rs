@@ -1,16 +1,9 @@
-use crate::job::{Job, EventType, GuildSetting};
-
-use std::sync::Arc;
 use chrono::NaiveDateTime;
-use serenity::{model::id::{UserId, GuildId}, prelude::TypeMapKey};
-
+use serenity::model::id::{UserId, GuildId};
+use crate::job::{Job, EventType, GuildSetting};
 
 pub struct SqliteDatabase {
     database: sqlx::SqlitePool,
-}
-
-impl TypeMapKey for SqliteDatabase {
-    type Value = Arc<SqliteDatabase>;
 }
 
 impl SqliteDatabase {
@@ -28,7 +21,7 @@ impl SqliteDatabase {
         SqliteDatabase { database }
     }
 
-    pub async fn pull_executables(&self) -> Result<Vec<Job>, sqlx::Error> {
+    pub async fn pop_executables(&self) -> Result<Vec<Job>, sqlx::Error> {
         sqlx::query_as!(
             Job,
             r#"DELETE FROM job
@@ -136,7 +129,7 @@ impl SqliteDatabase {
             .await
     }
 
-    pub async fn update_guild_setting(&self, guild_id: GuildId, utc_offset: &i64)
+    pub async fn update_guild_setting(&self, guild_id: GuildId, utc_offset: i64)
                                 -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
         let guild_id = guild_id.0 as i64;
 
