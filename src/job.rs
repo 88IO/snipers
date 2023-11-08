@@ -7,7 +7,7 @@ use serenity::{
         id::{GuildId, UserId}
     }
 };
-use chrono::{NaiveDateTime, DateTime, FixedOffset, TimeZone};
+use chrono::NaiveDateTime;
 use sqlx;
 use std::hash::Hash;
 
@@ -29,14 +29,13 @@ pub struct Job {
     pub user_id: i64,
     pub guild_id: i64,
     pub event_type: EventType,
-    pub utc_offset: i32
 }
 
 impl Job {
     #[allow(dead_code)]
     pub fn new(naive_utc: NaiveDateTime, user_id: UserId,
-               guild_id: GuildId, event_type: EventType, utc_offset: i32) -> Self {
-        Job { naive_utc, user_id: user_id.0 as i64, guild_id: guild_id.0 as i64, event_type, utc_offset }
+               guild_id: GuildId, event_type: EventType) -> Self {
+        Job { naive_utc, user_id: user_id.0 as i64, guild_id: guild_id.0 as i64, event_type }
     }
 
     pub fn userid(&self) -> UserId {
@@ -47,10 +46,8 @@ impl Job {
         GuildId::from(self.guild_id as u64)
     }
 
-    pub fn datetime(&self) -> DateTime<FixedOffset> {
-        FixedOffset::east_opt(3600 * self.utc_offset)
-            .unwrap()
-            .from_utc_datetime(&self.naive_utc)
+    pub fn timestamp(&self) -> i64 {
+        self.naive_utc.timestamp()
     }
 
     pub async fn disconnect(&self, ctx: &Context) -> serenity::Result<Member> {

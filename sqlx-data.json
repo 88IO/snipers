@@ -1,57 +1,5 @@
 {
   "db": "SQLite",
-  "01deb484929769284e105d32fbcc869a5f82a44b8a2df7d2a99fe573839d7df9": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 4
-      }
-    },
-    "query": "INSERT INTO job\n             (naive_utc, user_id, guild_id, event_type, utc_offset)\n             SELECT $1, $2, $3, $4, utc_offset FROM setting WHERE guild_id=$3"
-  },
-  "0708068374cded659d4aeb4d5c533e8e7fb0ead9795a6c0fcb3556799de060c6": {
-    "describe": {
-      "columns": [
-        {
-          "name": "naive_utc",
-          "ordinal": 0,
-          "type_info": "Datetime"
-        },
-        {
-          "name": "user_id",
-          "ordinal": 1,
-          "type_info": "Int64"
-        },
-        {
-          "name": "guild_id",
-          "ordinal": 2,
-          "type_info": "Int64"
-        },
-        {
-          "name": "event_type!: EventType",
-          "ordinal": 3,
-          "type_info": "Int64"
-        },
-        {
-          "name": "utc_offset!: i32",
-          "ordinal": 4,
-          "type_info": "Int64"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Right": 0
-      }
-    },
-    "query": "DELETE FROM job\n               WHERE naive_utc <= CURRENT_TIMESTAMP\n               RETURNING naive_utc, user_id, guild_id,\n                         event_type as \"event_type!: EventType\",\n                         utc_offset as \"utc_offset!: i32\""
-  },
   "0fc0d0ef8a1d14870742363ebb421be7b199d9630d536fdb3baa57c8fd877919": {
     "describe": {
       "columns": [],
@@ -86,6 +34,42 @@
     },
     "query": "SELECT guild_id, utc_offset as \"utc_offset!: i32\" FROM setting"
   },
+  "160f67239d4854078a201e878e480f1ba4e681715cf159f4d0822b003a841b60": {
+    "describe": {
+      "columns": [
+        {
+          "name": "naive_utc",
+          "ordinal": 0,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "guild_id",
+          "ordinal": 2,
+          "type_info": "Int64"
+        },
+        {
+          "name": "event_type!: EventType",
+          "ordinal": 3,
+          "type_info": "Int64"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "DELETE FROM job\n               WHERE naive_utc <= CURRENT_TIMESTAMP\n               RETURNING naive_utc, user_id, guild_id,\n                         event_type as \"event_type!: EventType\""
+  },
   "265b1ac299c7dfce7c29a78f3de7f7a1754b44217d8e17d46cda311073032974": {
     "describe": {
       "columns": [
@@ -109,48 +93,6 @@
       }
     },
     "query": "SELECT guild_id, utc_offset as 'utc_offset!: i32' FROM setting WHERE guild_id=?"
-  },
-  "2b7482c2a975f9c5c14508c3788b17a63b2390a91a629a3639393ed2a226a7c0": {
-    "describe": {
-      "columns": [
-        {
-          "name": "naive_utc",
-          "ordinal": 0,
-          "type_info": "Datetime"
-        },
-        {
-          "name": "user_id",
-          "ordinal": 1,
-          "type_info": "Int64"
-        },
-        {
-          "name": "guild_id",
-          "ordinal": 2,
-          "type_info": "Int64"
-        },
-        {
-          "name": "event_type!: EventType",
-          "ordinal": 3,
-          "type_info": "Int64"
-        },
-        {
-          "name": "utc_offset!: i32",
-          "ordinal": 4,
-          "type_info": "Int64"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Right": 1
-      }
-    },
-    "query": "SELECT naive_utc, user_id, guild_id,\n                    event_type as 'event_type!: EventType',\n                    utc_offset as 'utc_offset!: i32'\n             FROM job\n             WHERE guild_id=?\n             ORDER BY naive_utc ASC"
   },
   "3832c7e86ffb5dcd145fdcd867511ef60178d02f381fef9ffcad18505c0f1ff9": {
     "describe": {
@@ -199,5 +141,51 @@
       }
     },
     "query": "INSERT INTO setting (guild_id, utc_offset) VALUES (?, ?)"
+  },
+  "c4197b445b912cd10c7c5a767784bbd3c6a7dbca3152b6f1084e8f5ef9d21315": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 4
+      }
+    },
+    "query": "INSERT INTO job\n             (naive_utc, user_id, guild_id, event_type)\n             SELECT $1, $2, $3, $4"
+  },
+  "fb123554e24f8ee602db533057c20433fc72301377b8e7df9c5c7a3dfaf06e6a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "naive_utc",
+          "ordinal": 0,
+          "type_info": "Datetime"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 1,
+          "type_info": "Int64"
+        },
+        {
+          "name": "guild_id",
+          "ordinal": 2,
+          "type_info": "Int64"
+        },
+        {
+          "name": "event_type!: EventType",
+          "ordinal": 3,
+          "type_info": "Int64"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "SELECT naive_utc, user_id, guild_id,\n                    event_type as 'event_type!: EventType'\n             FROM job\n             WHERE guild_id=?\n             ORDER BY naive_utc ASC"
   }
 }

@@ -11,7 +11,6 @@ use serenity::{
 };
 use std::sync::Arc;
 use crate::job::EventType;
-use crate::commands::utils::*;
 use crate::SqliteDatabase;
 
 pub async fn run(ctx: Arc<Context>, command: &ApplicationCommandInteraction) {
@@ -35,7 +34,7 @@ pub async fn run(ctx: Arc<Context>, command: &ApplicationCommandInteraction) {
                                     .title("射殺予定")
                                     .description("snipebotの通話切断予定表"),
                                     |e, job|
-                                    e.field(job.datetime().format(DT_FORMAT),
+                                    e.field(format!("<t:{0}:t> <t:{0}:d>", job.timestamp()),
                                             Mention::from(job.userid()),
                                             false)
                         )

@@ -8,6 +8,12 @@
 
 ボイスチャットで話が弾んで離席しづらいことがあります。本アプリケーションは会議のタイムキープ、寝落ち対策としての利用を想定しています。
 
+## テスト版公開
+
+以下のリンクから招待できます。
+
+
+
 ## 機能
 
 - 時分単位で通話切断予約
@@ -19,6 +25,7 @@
 ## 要件
 
 - rustup (cargo)
+    - sqlx-cli (`cargo install sqlx-cli`)
 
 ## セットアップ
 
@@ -56,6 +63,7 @@ DATABASE_URL=sqlite:database.sqlite
 プロジェクトフォルダ下で
 
 ```
+sqlx migrate run
 cargo run --release
 ```
 

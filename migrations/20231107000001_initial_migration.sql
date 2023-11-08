@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS job (
     user_id BIGINT NOT NULL,
     guild_id BIGINT NOT NULL,
     event_type INTEGER NOT NULL,
-    utc_offset INTEGER NOT NULL,
     UNIQUE(naive_utc, user_id, guild_id, event_type)
 );
 

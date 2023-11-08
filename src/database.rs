@@ -18,6 +18,8 @@ impl SqliteDatabase {
             .await
             .expect("Couldn't connect to database");
 
+        sqlx::migrate!("./migrations").run(&database).await.expect("Couldn't run database migrations");
+
         SqliteDatabase { database }
     }
 
@@ -27,8 +29,7 @@ impl SqliteDatabase {
             r#"DELETE FROM job
                WHERE naive_utc <= CURRENT_TIMESTAMP
                RETURNING naive_utc, user_id, guild_id,
-                         event_type as "event_type!: EventType",
-                         utc_offset as "utc_offset!: i32""#
+                         event_type as "event_type!: EventType""#
             )
             .fetch_all(&self.database)
             .await
@@ -45,8 +46,8 @@ impl SqliteDatabase {
 
         sqlx::query!(
             "INSERT INTO job
-             (naive_utc, user_id, guild_id, event_type, utc_offset)
-             SELECT $1, $2, $3, $4, utc_offset FROM setting WHERE guild_id=$3",
+             (naive_utc, user_id, guild_id, event_type)
+             SELECT $1, $2, $3, $4",
             naive_utc, user_id, guild_id, event_type
             )
             .execute(&self.database)
@@ -75,8 +76,7 @@ impl SqliteDatabase {
         sqlx::query_as!(
             Job,
             "SELECT naive_utc, user_id, guild_id,
-                    event_type as 'event_type!: EventType',
-                    utc_offset as 'utc_offset!: i32'
+                    event_type as 'event_type!: EventType'
              FROM job
              WHERE guild_id=?
              ORDER BY naive_utc ASC",

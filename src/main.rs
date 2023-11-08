@@ -3,7 +3,6 @@ mod database;
 mod commands;
 use database::SqliteDatabase;
 use job::EventType;
-use commands::utils::DT_FORMAT;
 
 use dotenv::dotenv;
 use serenity::{
@@ -51,7 +50,7 @@ impl JobRunner {
                         EventType::Disconnect => {
                             if let Ok(_) = job.disconnect(&ctx1).await {
                                 job.direct_message(&ctx1, |m| {
-                                    m.content(format!("{}に通話を強制切断しました", job.datetime().format(DT_FORMAT)))
+                                    m.content(format!("<t:{0}:d> <t:{0}:T>に通話を強制切断しました", job.timestamp()))
                                 }).await.unwrap();
                             }
                         },

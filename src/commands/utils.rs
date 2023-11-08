@@ -1,12 +1,12 @@
 use serenity::builder::{CreateButton, CreateActionRow};
+use serenity::model::prelude::Role;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption,
     CommandDataOptionValue,
 };
 use serenity::model::application::component::ButtonStyle;
+use serenity::model::user::User;
 use std::fmt;
-
-pub const DT_FORMAT: &str = "%m/%d %H:%M:%S (%:z)";
 
 pub enum SnipeType {
     Relative,
@@ -86,6 +86,36 @@ pub fn int_option_ref<'a>(options: &'a [CommandDataOption], name: &str)
 
     if let CommandDataOptionValue::Integer(i) = option_value {
         Some(i)
+    } else {
+        None
+    }
+}
+
+pub fn user_option_ref<'a>(options: &'a [CommandDataOption], name: &str)
+                             -> Option<&'a User> {
+    let option_value = options
+        .iter()
+        .find(|&v| v.name == name)?
+        .resolved
+        .as_ref()?;
+
+    if let CommandDataOptionValue::User(user, _) = option_value {
+        Some(user)
+    } else {
+        None
+    }
+}
+
+pub fn role_option_ref<'a>(options: &'a [CommandDataOption], name: &str)
+                             -> Option<&'a Role> {
+    let option_value = options
+        .iter()
+        .find(|&v| v.name == name)?
+        .resolved
+        .as_ref()?;
+
+    if let CommandDataOptionValue::Role(role) = option_value {
+        Some(role)
     } else {
         None
     }
