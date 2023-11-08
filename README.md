@@ -12,7 +12,7 @@
 
 以下のリンクから招待できます。
 
-
+https://discord.com/api/oauth2/authorize?client_id=971782780952391690&permissions=16779264&scope=bot%20applications.commands
 
 ## 機能
 
@@ -25,7 +25,6 @@
 ## 要件
 
 - rustup (cargo)
-    - sqlx-cli (`cargo install sqlx-cli`)
 
 ## セットアップ
 
@@ -33,15 +32,15 @@
 
 **インテント（Botタブ）：**
 
-![](https://user-images.githubusercontent.com/36104864/125148766-87bf1b00-e16f-11eb-9806-e6f84d2b0733.png)
+![](https://github.com/88IO/tweers/assets/36104864/8738ed9f-eb53-4ae7-b1d8-d4ff098ff6b7)
 
 **スコープ（OAuth2タブ）：**
 
-![](https://user-images.githubusercontent.com/36104864/125148742-5e05f400-e16f-11eb-8593-e2ab853a000d.png)
+![](https://github.com/88IO/tweers/assets/36104864/b3d8a978-6bd1-4c5f-99ac-7c6ac13f4133)
 
 **権限（OAuth2タブ）：**
 
-![](https://user-images.githubusercontent.com/36104864/116031938-b746a700-a699-11eb-90b3-4586bc77e2fe.png)
+![](https://github.com/88IO/tweers/assets/36104864/aae0ac86-dff0-484f-a0b2-9682af48588d)
 
 詳細は [こちら](https://discordpy.readthedocs.io/ja/latest/discord.html#:~:text=Make%20sure%20you're%20logged%20on%20to%20the%20Discord%20website.&text=%E3%80%8CNew%20Application%E3%80%8D%E3%83%9C%E3%82%BF%E3%83%B3%E3%82%92%E3%82%AF%E3%83%AA%E3%83%83%E3%82%AF,%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%82%92%E4%BD%9C%E6%88%90%E3%81%97%E3%81%BE%E3%81%99%E3%80%82)
 
@@ -63,7 +62,6 @@ DATABASE_URL=sqlite:database.sqlite
 プロジェクトフォルダ下で
 
 ```
-sqlx migrate run
 cargo run --release
 ```
 
