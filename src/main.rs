@@ -39,13 +39,22 @@ impl JobRunner {
         };
 
         while database.count_jobs().await.unwrap() > 0 {
-            println!("loop...");
             let jobs = database.pop_executables().await.unwrap();
 
             for job in jobs {
                 let ctx1 = Arc::clone(&ctx);
                 tokio::spawn(async move {
                     println!("{:#?}", job);
+
+                    let guild = ctx1.cache.guild(job.guildid()).unwrap();
+                    if let Some(voice_state) = guild.voice_states.get(&job.userid()) {
+                        if voice_state.channel_id.is_none() {
+                            return;
+                        }
+                    } else {
+                        return;
+                    }
+
                     match job.event_type {
                         EventType::Disconnect => {
                             if let Ok(_) = job.disconnect(&ctx1).await {

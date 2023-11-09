@@ -11,7 +11,7 @@ use serenity::{
     prelude::*
 };
 use std::{sync::{Arc, atomic::Ordering}, collections::HashSet};
-use chrono::{Utc, Duration, FixedOffset, DateTime, Timelike};
+use chrono::{Utc, Duration, FixedOffset, Timelike, NaiveDateTime};
 use regex::{Regex, Match};
 use tokio::sync::OnceCell;
 use crate::job::EventType;
@@ -25,10 +25,10 @@ pub async fn run(ctx: Arc<Context>, command: &ApplicationCommandInteraction) {
         Regex::new(r"(?:(?P<hour>\d{1,2})(?:時間|時|:|：|hours|hour|h|Hours|Hour|H|\s^@))?(?:(?P<minute>\d{1,2})(?:分|mins|min|m|Mins|Min|M|))?").unwrap()}).await;
     let time = string_option_ref(&command.data.options, "time").unwrap();
     let caps = re_time.captures(time).unwrap();
-    let hour = caps.name("hour");
-    let minute = caps.name("minute");
+    let h_opt = caps.name("hour");
+    let m_opt = caps.name("minute");
 
-    if hour.is_none() && minute.is_none() {
+    if h_opt.is_none() && m_opt.is_none() {
         command
             .create_interaction_response(&ctx.http, |response| {
                 response
@@ -76,11 +76,6 @@ pub async fn run(ctx: Arc<Context>, command: &ApplicationCommandInteraction) {
         data_read.get::<JobRunner>().unwrap().clone()
     };
 
-    let utc_offset = {
-        let guild_setting = database.get_guild_setting(guild_id).await.unwrap();
-        guild_setting.utc_offset
-    };
-
     let snipe_type = match types {
         Some(t) => t.to_owned(),
         None => {
@@ -119,9 +114,14 @@ pub async fn run(ctx: Arc<Context>, command: &ApplicationCommandInteraction) {
         }
     };
 
-    let target_datetime: DateTime<FixedOffset> = match snipe_type.as_str() {
-        "at" => absolute_datetime(hour, minute, utc_offset),
-        "in" => relative_datetime(hour, minute, utc_offset),
+    let target_datetime: NaiveDateTime = match snipe_type.as_str() {
+        "at" => {
+            let guild_setting = database.get_guild_setting(guild_id).await.unwrap();
+            absolute_datetime(h_opt, m_opt, guild_setting.utc_offset)
+        },
+        "in" => {
+            relative_datetime(h_opt, m_opt)
+        },
         _ => panic!("unexpected SnipeType.")
     };
 
@@ -165,33 +165,31 @@ pub async fn run(ctx: Arc<Context>, command: &ApplicationCommandInteraction) {
     }
 }
 
-fn relative_datetime(h_opt: Option<Match>, m_opt: Option<Match>, utc_offset: i32) -> DateTime<FixedOffset> {
+fn relative_datetime(h_opt: Option<Match>, m_opt: Option<Match>) -> NaiveDateTime {
     let hour: u32 = if let Some(h) = h_opt { h.as_str().parse().unwrap() } else { 0 };
     let minute: u32 = if let Some(m) = m_opt { m.as_str().parse().unwrap() } else { 0 };
     let datetime_utc = Utc::now() + Duration::hours(hour.into()) + Duration::minutes(minute.into());
-    datetime_utc.with_timezone(&FixedOffset::east_opt(3600 * utc_offset).unwrap())
+
+    datetime_utc.naive_utc()
 }
 
-fn absolute_datetime(h_opt: Option<Match>, m_opt: Option<Match>, utc_offset: i32) -> DateTime<FixedOffset> {
-    let utc_now = Utc::now();
-    let hour: u32 = if let Some(h) = h_opt { h.as_str().parse().unwrap() } else { utc_now.hour() };
-    let minute: u32 = if let Some(m) = m_opt { m.as_str().parse().unwrap() } else { utc_now.minute() };
-    let mut tmp_datetime = DateTime::<FixedOffset>::from_utc(
-        utc_now.date_naive().and_hms_opt(hour, minute, 0).unwrap(),
-        FixedOffset::east_opt(3600 * utc_offset).unwrap());
+fn absolute_datetime(h_opt: Option<Match>, m_opt: Option<Match>, utc_offset: i32) -> NaiveDateTime {
+    let local_now = Utc::now().with_timezone(&FixedOffset::east_opt(3600 * utc_offset).unwrap());
+    let hour: u32 = if let Some(h) = h_opt { h.as_str().parse().unwrap() } else { local_now.hour() };
+    let minute: u32 = if let Some(m) = m_opt { m.as_str().parse().unwrap() } else { local_now.minute() };
+    let mut tmp_datetime = local_now.naive_local().date().and_hms_opt(hour, minute, 0).unwrap();
 
-    if h_opt.is_none() && utc_now.minute() > tmp_datetime.minute() {
+    tmp_datetime -= Duration::hours(utc_offset.into());
+    if h_opt.is_none() && local_now.minute() > tmp_datetime.minute() {
         tmp_datetime += Duration::hours(1);
-    } else if utc_now >= tmp_datetime {
+    } else if local_now.naive_utc() >= tmp_datetime {
         tmp_datetime += Duration::days(1);
     }
 
     tmp_datetime
 }
 
-async fn add_job(database: Arc<SqliteDatabase>, datetime: DateTime<FixedOffset>, user_id: UserId, guild_id: GuildId) {
-    let naive_utc = datetime.naive_utc();
-
+async fn add_job(database: Arc<SqliteDatabase>, naive_utc: NaiveDateTime, user_id: UserId, guild_id: GuildId) {
     // 切断前通知予約
     let before3min = naive_utc - Duration::minutes(3);
     if before3min.timestamp() > Utc::now().timestamp() {
